@@ -173,3 +173,65 @@ VERDICT: FAIL
 - **Hook:** the hook still has no number (rule 3). It is acceptable given the on-frame title.
 - **Latin vowel:** whisper hears "edax" as "edex". An open "a" could be emphasised if the Latin is regenerated. The caption already covers it.
 - **Cleanup:** `render.mp4` (56 MB) and `voice-tests/` sit in the video folder. Remove them when final, or confirm the non-audio files in `voice-tests/` are meant to be committed.
+
+---
+
+## Round 4 — word-onset snapping, reframed ending
+
+Scratch output is in `frames/r4/` (gitignored). Voice and edit are unchanged except for the two reframed shots, so I reran the technical checks and focused on timing.
+
+### Technical re-run — PASS
+h264 1080×1920 at 30 fps plus AAC, 57.3 s. Integrated −14.64 LUFS, true peak −3.86 dBTP. No black segments.
+
+### (b) Karaoke timing — PASS (Round 3 blocker resolved)
+I compared words.json with two independent references:
+- whisper small word timestamps on the new final.mp4 (`frames/r4/final.json`)
+- `silencedetect` (−35 dB, 0.08 s) on voice.wav
+
+112 of 121 words matched by text, with median offset 0.00 s and mean +0.02 s. **No word starts early** (none more than 0.15 s before whisper).
+
+Seven words start more than 0.15 s *after* whisper's start: Every, Those, Time, It, by, But and ate. Whisper places a word's start at the end of the previous word, so each of these could either be a whisper artefact or a real late snap. I checked every one against the audio:
+
+| Word | words.json | whisper | Audio evidence | Result |
+|---|---|---|---|---|
+| Every | 3.08 | 2.84 | silence 1.93–3.11; clip 2.00–3.07 transcribes to nothing | on time |
+| Those | 17.62 | 17.26 | envelope at 17.26–17.46 is −40 dB (a breath; speech peaks near −10 dB), then onset at 17.62; clip 17.20–17.60 is empty, clip 17.60–18.20 is "Those three" | on time |
+| Time, (23.7) | 23.69 | 23.48 | silence 22.65–23.70 | on time |
+| It | 27.25 | 27.02 | silence 26.27–27.26 | on time |
+| by | 29.51 | 29.10 | silence 29.23–29.51 | on time |
+| But | 39.09 | 38.94 | silence 38.01–39.10 | on time |
+| ate | 53.24 | 52.98 | "Time" is drawn out over 52.62–53.14, then a 100 ms gap, then onset at 53.24. Clip 52.55–53.16 is "time", clip 53.20–53.47 is "Eight.", clip 53.20–54.05 is "8 The Forum" | on time |
+
+The Round 3 words also check out:
+- "Rome's" 7.82: silence 7.67–7.83; clip 7.50–7.80 is empty, clip 7.82–8.60 is "Rome's forum".
+- **"And" 54.67**: silence 54.03–54.68; clip 54.00–54.66 is empty, clip 54.67–55.50 is "and it is still hungry."
+- "edax" 0.82: the "s" of "Tempus" runs 0.54–0.70 (high ZCR), then silence 0.71–0.81, then onset at 0.82.
+
+**No word lights before it is heard, and none lights after it.** Frame grabs agree:
+- At 53.0 s the caption shows "**Time** ate the" with Time lit, while Time is still being spoken.
+- At 54.1 and 54.4 s the caption holds "**Forum.**" through the pause, with no early "And".
+- At 54.8 s the caption is "And **it** is", matching the audio.
+
+The nine words whisper did not match by text (edax, Campo, Vaccino, cow, field, two, thousand, Temples, shalt) all start at or within 0.02 s of a silence end.
+
+### Ending frames — PASS
+I checked frames at 53.0, 54.1, 54.4, 54.8, 55.4, 56.3 and 57.2 s (`frames/r4/end_sheet.jpg`).
+- The closing Goya (focus y 0.30→0.27, zoom 1.0→1.15) now shows Saturn's full face from the first frame of the shot (54.1 s) to the end.
+- The captions "Forum." / "And it is" / "still hungry." sit over the body, below the face.
+- The last frame (57.2 s) matches the opening Goya shot closely, so the loop reads cleanly.
+- The Lorrain shot (10.0–12.8 s) is back to a 1.5→1.25 zoom, and the canvas weave is no longer prominent at display size.
+
+### Other checks
+Captions, hook, facts & quotes, licensing and frame layout are unchanged since Round 3 and still PASS. The handle "@romansinstone" is still an unconfirmed placeholder and must be confirmed before publishing; it is not failed.
+
+---
+
+VERDICT: PASS
+
+## Fixes for the director (blocking)
+None.
+
+## Nice to have (non-blocking)
+- Confirm the "@romansinstone" handle with the user before publishing.
+- Consider a PD source for the Campo Vaccino / cattle-pasture history (from Round 3).
+- Clean up `render.mp4` and `voice-tests/` when final.
