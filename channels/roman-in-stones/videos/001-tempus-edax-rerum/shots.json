@@ -1,0 +1,362 @@
+[
+ {
+  "image": "../../content/art/francisco-de-goya-saturno-devorando-a-su-hijo-1819-1823.jpg",
+  "start": 0.0,
+  "end": 2.7,
+  "zoom": [
+   1.15,
+   1.45
+  ],
+  "focus": [
+   [
+    0.45,
+    0.32
+   ],
+   [
+    0.42,
+    0.28
+   ]
+  ],
+  "beat": "Tempus edax rerum."
+ },
+ {
+  "image": "../../content/art/rubens-saturn.jpg",
+  "start": 2.7,
+  "end": 7.1,
+  "zoom": [
+   1.0,
+   1.3
+  ],
+  "focus": [
+   [
+    0.5,
+    0.45
+   ],
+   [
+    0.55,
+    0.38
+   ]
+  ],
+  "beat": "Every empire ends the same way. Eaten."
+ },
+ {
+  "image": "../../content/art/cole-thomas-the-consummation-the-course-of-the-empire-1836.jpg",
+  "start": 7.1,
+  "end": 10.0,
+  "zoom": [
+   1.0,
+   1.15
+  ],
+  "focus": [
+   [
+    0.35,
+    0.45
+   ],
+   [
+    0.45,
+    0.5
+   ]
+  ],
+  "beat": "Rome's Forum was the heart of the world."
+ },
+ {
+  "image": "../../content/art/vue-du-campo-vaccino-claude-gellee-dit-le-lorrain-louvre-inv-4713-mr-1741.jpg",
+  "start": 10.0,
+  "end": 12.8,
+  "zoom": [
+   1.5,
+   1.25
+  ],
+  "focus": [
+   [
+    0.6,
+    0.69
+   ],
+   [
+    0.56,
+    0.64
+   ]
+  ],
+  "beat": "By the Renaissance, cows grazed on it."
+ },
+ {
+  "image": "../../content/art/piranesi-campo-vaccino.jpg",
+  "start": 12.8,
+  "end": 16.8,
+  "zoom": [
+   1.35,
+   1.15
+  ],
+  "focus": [
+   [
+    0.35,
+    0.5
+   ],
+   [
+    0.5,
+    0.5
+   ]
+  ],
+  "beat": "Locals called it Campo Vaccino. The cow field."
+ },
+ {
+  "image": "../../content/art/eugene-delacroix-ovide-chez-les-scythes-1859.jpg",
+  "start": 16.8,
+  "end": 20.7,
+  "zoom": [
+   1.3,
+   1.6
+  ],
+  "focus": [
+   [
+    0.32,
+    0.62
+   ],
+   [
+    0.3,
+    0.66
+   ]
+  ],
+  "beat": "Those three Latin words came from a Roman poet."
+ },
+ {
+  "image": "../../content/art/allegorische-titelpagina-met-portret-van-publius-ovidius-naso-titelpagina-voor-p.jpg",
+  "start": 20.7,
+  "end": 23.2,
+  "zoom": [
+   1.3,
+   2.0
+  ],
+  "focus": [
+   [
+    0.5,
+    0.35
+   ],
+   [
+    0.5,
+    0.18
+   ]
+  ],
+  "beat": "Ovid, two thousand years ago."
+ },
+ {
+  "image": "../../content/art/the-dance-to-the-music-of-time-c-1640.jpg",
+  "start": 23.2,
+  "end": 26.7,
+  "zoom": [
+   1.6,
+   1.9
+  ],
+  "focus": [
+   [
+    0.78,
+    0.62
+   ],
+   [
+    0.86,
+    0.66
+   ]
+  ],
+  "beat": "Time, the consumer of all things."
+ },
+ {
+  "image": "../../content/art/cole-thomas-the-course-of-empire-destruction-1836.jpg",
+  "start": 26.7,
+  "end": 32.8,
+  "zoom": [
+   1.0,
+   1.25
+  ],
+  "focus": [
+   [
+    0.45,
+    0.5
+   ],
+   [
+    0.58,
+    0.45
+   ]
+  ],
+  "beat": "by the teeth of age, with a slow death"
+ },
+ {
+  "image": "../../content/art/hubert-robert-ruins-of-a-doric-temple.jpg",
+  "start": 32.8,
+  "end": 34.0,
+  "zoom": [
+   1.0,
+   1.08
+  ],
+  "focus": [
+   [
+    0.55,
+    0.45
+   ],
+   [
+    0.6,
+    0.45
+   ]
+  ],
+  "beat": "Temples."
+ },
+ {
+  "image": "../../content/art/hubert-robert-aqueduct-in-ruins.jpg",
+  "start": 34.0,
+  "end": 35.0,
+  "zoom": [
+   1.0,
+   1.08
+  ],
+  "focus": [
+   [
+    0.5,
+    0.45
+   ],
+   [
+    0.45,
+    0.45
+   ]
+  ],
+  "beat": "Arches."
+ },
+ {
+  "image": "../../content/art/galerie-de-vues-de-la-rome-antique-giovanni-paolo-pannini-musee-du-louvre-peintu.jpg",
+  "start": 35.0,
+  "end": 36.2,
+  "zoom": [
+   1.0,
+   1.1
+  ],
+  "focus": [
+   [
+    0.5,
+    0.5
+   ],
+   [
+    0.5,
+    0.45
+   ]
+  ],
+  "beat": "A whole empire."
+ },
+ {
+  "image": "../../content/art/cole-thomas-the-course-of-empire-desolation-1836.jpg",
+  "start": 36.2,
+  "end": 38.7,
+  "zoom": [
+   1.0,
+   1.2
+  ],
+  "focus": [
+   [
+    0.35,
+    0.45
+   ],
+   [
+    0.3,
+    0.4
+   ]
+  ],
+  "beat": "Eaten one stone at a time."
+ },
+ {
+  "image": "../../content/art/hubert-robert-imaginary-view-of-rome-with-equestrian-statue-of-marcus-aurelius-t.jpg",
+  "start": 38.7,
+  "end": 41.8,
+  "zoom": [
+   1.0,
+   1.5
+  ],
+  "focus": [
+   [
+    0.45,
+    0.5
+   ],
+   [
+    0.25,
+    0.6
+   ]
+  ],
+  "beat": "But the emperor Marcus Aurelius found peace in it."
+ },
+ {
+  "image": "../../content/art/joseph-mallord-william-turner-ancient-rome-agrippina-landing-with-the-ashes-of-g.jpg",
+  "start": 41.8,
+  "end": 47.6,
+  "zoom": [
+   1.0,
+   1.2
+  ],
+  "focus": [
+   [
+    0.5,
+    0.5
+   ],
+   [
+    0.4,
+    0.6
+   ]
+  ],
+  "beat": "That time also is at hand, when thou thyself shalt be forgotten by all."
+ },
+ {
+  "image": "../../content/art/joseph-mallord-william-turner-british-modern-rome-campo-vaccino-google-art-proje.jpg",
+  "start": 47.6,
+  "end": 51.8,
+  "zoom": [
+   1.0,
+   1.15
+  ],
+  "focus": [
+   [
+    0.5,
+    0.45
+   ],
+   [
+    0.55,
+    0.4
+   ]
+  ],
+  "beat": "So do what is right, while you still are."
+ },
+ {
+  "image": "../../content/art/vue-du-campo-vaccino-claude-gellee-dit-le-lorrain-louvre-inv-4713-mr-1741.jpg",
+  "start": 51.8,
+  "end": 54.0,
+  "zoom": [
+   1.0,
+   1.3
+  ],
+  "focus": [
+   [
+    0.5,
+    0.5
+   ],
+   [
+    0.58,
+    0.62
+   ]
+  ],
+  "beat": "Time ate the Forum."
+ },
+ {
+  "image": "../../content/art/francisco-de-goya-saturno-devorando-a-su-hijo-1819-1823.jpg",
+  "start": 54.0,
+  "end": 57.3,
+  "zoom": [
+   1.0,
+   1.15
+  ],
+  "focus": [
+   [
+    0.47,
+    0.3
+   ],
+   [
+    0.44,
+    0.27
+   ]
+  ],
+  "beat": "And it is still hungry."
+ }
+]

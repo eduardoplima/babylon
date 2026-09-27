@@ -1,0 +1,16 @@
+.DS_Store
+.venv/
+.playwright-mcp/
+__pycache__/
+/videos/
+channels/*/content/art/*
+!channels/*/content/art/.gitkeep
+channels/*/content/music/*
+channels/*/videos/**/*.mp4
+channels/*/videos/**/*.mp3
+channels/*/videos/**/*.wav
+channels/*/videos/**/frames/
+channels/*/scout/raw/
+.venvs/
+channels/*/videos/**/voice-tests/_*
+channels/*/videos/**/voice-tests/latin/

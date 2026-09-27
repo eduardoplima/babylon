@@ -1,0 +1,4 @@
+chatterbox-tts
+soundfile
+openai-whisper
+setuptools<80

@@ -1,0 +1,6 @@
+moviepy
+pillow
+opencv-python
+numpy
+edge-tts
+requests
