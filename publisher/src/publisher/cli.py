@@ -16,7 +16,7 @@ app = typer.Typer(no_args_is_help=True, add_completion=False, help=__doc__)
 auth_app = typer.Typer(no_args_is_help=True, help="Authorize platforms (stores tokens in the secrets folder).")
 app.add_typer(auth_app, name="auth")
 
-IMPLEMENTED = ("youtube", "instagram")
+IMPLEMENTED = ("youtube", "instagram", "tiktok")
 
 
 def _settings() -> Settings:
@@ -35,7 +35,7 @@ class _DryAuth:
 
 def _adapters(settings: Settings, live: bool, only: list[str] | None = None) -> dict[str, Platform]:
     """Adapters for implemented platforms. In dry-run no credentials are loaded."""
-    from .platforms import instagram, youtube
+    from .platforms import instagram, tiktok, youtube
 
     store = TokenStore(settings.path(settings.secrets_dir))
     adapters: dict[str, Platform] = {}
@@ -47,7 +47,16 @@ def _adapters(settings: Settings, live: bool, only: list[str] | None = None) -> 
             cfg = settings.platform("instagram")
             auth = instagram.InstagramAuth(store, cfg) if live else _DryAuth()
             adapters[name] = instagram.Instagram(cfg, auth)
+        elif name == "tiktok":
+            adapters[name] = tiktok.TikTok(settings.platform("tiktok"), _tiktok_auth(settings) if live else _DryAuth())
     return adapters
+
+
+def _tiktok_auth(settings: Settings):
+    from .platforms import tiktok
+
+    return tiktok.TikTokAuth(TokenStore(settings.path(settings.secrets_dir)), settings.platform("tiktok"),
+                             settings.tiktok_client_key, settings.tiktok_client_secret.get_secret_value())
 
 
 @contextmanager
@@ -116,7 +125,8 @@ def publish_due(live: Annotated[bool, typer.Option("--live", help="actually publ
     items, errors = content.load_all(settings)
     for e in errors:
         typer.echo(f"✗ {e}", err=True)
-    caps = {"youtube": settings.platform("youtube")["uploads_per_day"]}
+    caps = {"youtube": settings.platform("youtube")["uploads_per_day"],
+            "tiktok": settings.platform("tiktok")["pending_shares_per_day"]}
     _run(settings, live, lambda conn, adapters, lg: service.publish_due(
         items, adapters, conn, live=live, now=datetime.now(timezone.utc), tz=settings.tz, daily_caps=caps, log=lg))
 
@@ -213,6 +223,52 @@ def auth_instagram():
                f"expires {info['expires_at'][:10]}, refreshed automatically after 24 h.")
 
 
+@auth_app.command("tiktok")
+def auth_tiktok():
+    """Open the browser for TikTok Login Kit (desktop, PKCE) and store the tokens.
+    Needs PUBLISHER_TIKTOK_CLIENT_KEY/SECRET in .env and redirect http://127.0.0.1:*/callback/ registered."""
+    import webbrowser
+
+    from .platforms import tiktok
+
+    settings = _settings()
+    try:
+        info = tiktok.run_login(_tiktok_auth(settings), settings.platform("tiktok"), webbrowser.open)
+    except AuthRequired as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2)
+    typer.echo(f"TikTok authorized (scopes: {info['scope']}); access renews daily, re-login needed by "
+               f"{info['refresh_expires_at'][:10]}.")
+
+
+@app.command()
+def link(slug: str, platform: str,
+         video_id: Annotated[Optional[str], typer.Argument(help="the public video id; looked up when omitted")] = None):
+    """Record the public post for a draft you finished in the app (TikTok inbox uploads)."""
+    if platform != "tiktok":
+        typer.echo("only tiktok drafts need linking", err=True)
+        raise typer.Exit(2)
+    from .platforms import tiktok
+
+    settings = _settings()
+    conn = db.connect(settings.path(settings.db_path))
+    row = db.get(conn, slug, platform)
+    if not row or row["state"] not in (db.SENT_TO_INBOX, db.PUBLISHED):
+        typer.echo(f"{slug} [tiktok] is not in the inbox yet (state: {row['state'] if row else 'none'})", err=True)
+        raise typer.Exit(1)
+    if not video_id:
+        try:
+            video_id = tiktok.TikTok(settings.platform("tiktok"), _tiktok_auth(settings)).public_post_id(row["upload_session"])
+        except AuthRequired as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(2)
+        if not video_id:
+            typer.echo("not public yet: post the draft from the TikTok inbox (or pass the video id)")
+            raise typer.Exit(1)
+    db.update(conn, row["id"], state=db.PUBLISHED, remote_id=video_id, last_error=None)
+    typer.echo(f"{slug} [tiktok] linked to video {video_id}")
+
+
 @auth_app.command("refresh")
 def auth_refresh():
     """Refresh tokens that are due (safe to run daily from cron) and show how long each lasts."""
@@ -228,6 +284,13 @@ def auth_refresh():
         except AuthRequired as exc:
             failed = True
             typer.echo(f"youtube: {exc}", err=True)
+    if store.read("tiktok"):
+        try:
+            _tiktok_auth(settings).token(True)
+            typer.echo(f"tiktok: refreshed (re-login by {store.read('tiktok')['refresh_expires_at'][:10]})")
+        except AuthRequired as exc:
+            failed = True
+            typer.echo(f"tiktok: {exc}", err=True)
     if store.read("instagram"):
         auth = instagram.InstagramAuth(store, settings.platform("instagram"))
         try:

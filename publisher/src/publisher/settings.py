@@ -5,6 +5,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import yaml
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,8 @@ class Settings(BaseSettings):
     babylon_root: Path = Path("..")
     timezone: str = "America/Sao_Paulo"
     youtube_client_secrets: Path = Path(".secrets/youtube_client_secret.json")
+    tiktok_client_key: str = ""
+    tiktok_client_secret: SecretStr = SecretStr("")
 
     def path(self, p: Path) -> Path:
         return p if p.is_absolute() else self.home / p

@@ -73,8 +73,22 @@ instagram:
     max_size_bytes: 314572800   # 300 MB
 
 tiktok:
-  # Phase 3. https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide
+  # Content Posting API, Upload (inbox/draft) mode: the creator finishes the post in the app.
+  # https://developers.tiktok.com/doc/content-posting-api-reference-upload-video
   api_url: https://open.tiktokapis.com
+  # Desktop Login Kit (PKCE, loopback redirect http://127.0.0.1:<port>/callback/).
+  # https://developers.tiktok.com/doc/login-kit-desktop
+  auth_url: https://www.tiktok.com/v2/auth/authorize/
+  scopes: [video.upload, video.list]
+  # "at most 5 pending shares within any 24-hour period" (spam_risk_too_many_pending_share)
+  pending_shares_per_day: 5
+  # Chunks: 5–64 MB each, the last may be up to 128 MB; files under 5 MB (and here, up to 64 MB)
+  # go in one piece; total_chunk_count = floor(video_size / chunk_size).
+  # https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide
+  single_chunk_max_bytes: 67108864
+  chunk_size_bytes: 10485760
+  processing_poll_seconds: 10     # status/fetch allows 30 requests/min per token
+  processing_timeout_seconds: 300
   metadata:
     caption_max: 2200
   limits:

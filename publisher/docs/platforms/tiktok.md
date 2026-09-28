@@ -1,4 +1,4 @@
-# TikTok (Content Posting API, inbox/draft mode) — phase 3
+# TikTok (Content Posting API, inbox/draft mode)
 
 Research checked 2026-09-27.
 
@@ -24,3 +24,44 @@ Research checked 2026-09-27.
   https://developers.tiktok.com/docs/en/tiktok-api-v2-video-object
 - **Não confirmado:** whether inbox-only apps need the audit; whether `video/query` returns private videos;
   the aspect-ratio rules.
+
+## Request formats used (verified 2026-09-28)
+- **Init:** `POST https://open.tiktokapis.com/v2/post/publish/inbox/video/init/` with the headers
+  `Authorization: Bearer <token>` and `Content-Type: application/json; charset=UTF-8`.
+  - Body: `{"source_info": {"source": "FILE_UPLOAD", "video_size", "chunk_size", "total_chunk_count"}}`.
+  - Response: `data.publish_id` and `data.upload_url` (valid 1 h), plus `error.code == "ok"`.
+  - **Inbox mode has no `post_info`**, so no caption or privacy. The creator sets both in the app.
+- **Upload:** `PUT <upload_url>` with `Content-Type: video/mp4`, `Content-Length` and `Content-Range: bytes a-b/total`, sent in order.
+  - Responses: 206 means more chunks follow; 201 means done; 403 means the URL expired; 5xx means retry the chunk.
+  - Chunking: files up to 64 MB go in one piece. Larger files use 10 MiB chunks, with `total_chunk_count = floor(size/chunk)`,
+    and the last chunk takes the remainder (up to 128 MB).
+- **Status:** `POST /v2/post/publish/status/fetch/` with `{"publish_id"}` returns `data.status`, `data.fail_reason` and
+  `data.publicaly_available_post_id` (a list, spelled that way).
+  - Inbox uploads rest at `SEND_TO_USER_INBOX`. They reach `PUBLISH_COMPLETE` once the creator posts,
+    and the public id appears after moderation.
+- **OAuth:**
+  - Authorize at `https://www.tiktok.com/v2/auth/authorize/?client_key&scope=a,b&response_type=code&redirect_uri&state&code_challenge&code_challenge_method=S256`.
+  - **The challenge is the HEX-encoded SHA-256** of the verifier.
+  - Token: `POST /v2/oauth/token/`, form-encoded, with `client_key`, `client_secret`, `code`, `grant_type`, `redirect_uri` and `code_verifier`.
+    The refresh request uses `grant_type=refresh_token&refresh_token`, and the refresh token rotates.
+  - OAuth errors are flat: `{"error", "error_description", "log_id"}`.
+
+## Implementation decisions
+- **Crash recovery:** an upload interrupted mid-way starts over with a new init; the chunk URL lasts 1 h and resuming is not described.
+  If the process died after a finished upload, the status (`SEND_TO_USER_INBOX`) shows it and nothing is resent.
+  - TODO(verificar): whether an abandoned init counts toward the 5 pending shares.
+- **`sent_to_inbox` is terminal** for publishing. `publisher link` moves it to `published` using the public post id,
+  either looked up from the status or passed by hand.
+- **Error handling:**
+
+| Error | Handling |
+|---|---|
+| `internal_error`, `rate_limit_exceeded`, 5xx | Transient |
+| `access_token_invalid` | Refresh the token once, then retry |
+| `spam_risk_too_many_pending_share`, fail reason `spam_risk_too_many_posts` | Retry after an hour |
+| fail reason `internal` | New upload |
+| Other fail reasons | Permanent |
+
+- **Não confirmado:** whether an unaudited app with only `video.upload` can post from your own account.
+  The upload get-started page mentions no audit, but a search snippet suggests private-only restrictions.
+  Your first real run will tell.

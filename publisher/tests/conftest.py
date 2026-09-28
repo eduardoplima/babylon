@@ -29,11 +29,21 @@ def no_network(monkeypatch):
     connection attempt (httpx unmocked, requests, google-auth) fails loudly."""
     import socket
 
-    def refuse(*args, **kwargs):
-        raise RuntimeError("network access in tests is forbidden; mock it with respx")
+    real_connect, real_create = socket.socket.connect, socket.create_connection
+    loopback = lambda address: isinstance(address, tuple) and address[0] in ("127.0.0.1", "localhost")
 
-    monkeypatch.setattr(socket.socket, "connect", refuse)
-    monkeypatch.setattr(socket, "create_connection", refuse)
+    def connect(self, address):
+        if not loopback(address):  # only local OAuth callback servers are reachable
+            raise RuntimeError("network access in tests is forbidden; mock it with respx")
+        return real_connect(self, address)
+
+    def create_connection(address, *args, **kwargs):
+        if not loopback(address):
+            raise RuntimeError("network access in tests is forbidden; mock it with respx")
+        return real_create(address, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket, "create_connection", create_connection)
 
 
 @pytest.fixture(scope="session")

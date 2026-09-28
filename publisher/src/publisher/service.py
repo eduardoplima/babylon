@@ -45,7 +45,7 @@ def publish(item: ContentItem, adapter: Platform, conn: sqlite3.Connection, *, l
     if errors:
         return out("invalid", "; ".join(str(i) for i in errors))
     if not live:  # dry-run: no network, no DB writes
-        resume = f" (resume from state {state})" if row else ""
+        resume = f" (resume from state {state})" if row and state != db.PENDING else ""
         return out("dry-run", adapter.describe(item) + resume + (f" [{warnings}]" if warnings else ""))
 
     adapter.preflight()  # AuthRequired propagates before any state is written
@@ -90,7 +90,10 @@ def publish(item: ContentItem, adapter: Platform, conn: sqlite3.Connection, *, l
     if log:
         log.info("publish.ok", state=pub["state"], remote_id=pub.get("remote_id"))
     if pub["state"] == db.PROCESSING:
-        return out("processing", f"{pub['remote_url']} still processing; next run will check again")
+        return out("processing", f"{pub.get('remote_url') or pub.get('upload_session')} still processing; next run will check again")
+    if pub["state"] == db.SENT_TO_INBOX:
+        return out("sent_to_inbox", "open the TikTok inbox notification to finish the post; "
+                   f"caption: {item.meta.tiktok.caption!r}. Then `publisher link {slug} tiktok`")
     return out("published", pub.get("remote_url") or "")
 
 
@@ -139,7 +142,7 @@ def publish_due(items: list[ContentItem], adapters: dict[str, Platform], conn: s
                     outcomes.append(Outcome(item.slug, name, "skipped", "platform publishing quota used up for now"))
                     continue
             result = publish(item, adapter, conn, live=live, log=log, sleep=sleep, now=now)
-            if live and fresh and result.action in ("published", "processing", "failed"):
+            if live and fresh and result.action in ("published", "processing", "sent_to_inbox", "failed"):
                 used[name] += 1 if db.get(conn, item.slug, name)["upload_started_at"] else 0
             if name in live_quota and result.action == "published":
                 live_quota[name] -= 1
