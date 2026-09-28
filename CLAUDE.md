@@ -48,6 +48,13 @@ Use the `loop-short` skill (`.claude/skills/loop-short/`). It produces a looping
 vertical short from topic to reviewed `final.mp4`. The pipeline is `scripts/build_short.py <dir> voice|render`,
 and `scripts/check_short.py <dir>` runs the automated checks.
 
+## Publishing
+
+`publisher/` is a separate uv project (Python 3.12) that publishes finished videos and collects metrics:
+`cd publisher && uv run publisher --help`. See `publisher/README.md`. Its platform limits and
+API research live in `publisher/config/platforms.yaml` and `publisher/docs/platforms/`. Never write
+platform API calls from memory: check the official docs and mark anything unconfirmed `TODO(verificar)`.
+
 ## Rules
 
 - **Only public-domain or openly licensed material** (PD, CC0, CC-BY with credit).

@@ -1,0 +1,79 @@
+# Per-platform limits and settings. Every number cites the official page it came
+# from (checked 2026-09-27). Anything not confirmed is marked TODO(verificar).
+# See docs/platforms/*.md for the full research notes.
+
+timezone: America/Sao_Paulo
+
+# Allowed values for meta.yaml `hook_type` and `format` (edit freely; used by `export`).
+taxonomy:
+  hook_type: [unclassified, foreign-quote, shock-image, shock-claim, question, myth-bust, superlative, number, visual-puzzle]
+  format: [unclassified, loop-paintings-narrated]
+
+youtube:
+  # https://developers.google.com/youtube/v3/docs/videos/insert
+  upload_url: https://www.googleapis.com/upload/youtube/v3/videos
+  api_url: https://www.googleapis.com/youtube/v3
+  # Default allocation: 100 videos.insert calls per day in their own quota bucket.
+  # https://developers.google.com/youtube/v3/getting-started
+  uploads_per_day: 100
+  # A per-channel daily upload cap also exists (error uploadLimitExceeded); its size is
+  # TODO(verificar): not documented.
+  processing_poll_seconds: 15
+  processing_timeout_seconds: 900
+  metadata:
+    # TODO(verificar): title max 100 characters and description max 5000 bytes are from the
+    # videos resource page; re-check before relying on them.
+    title_max: 100
+    description_max: 5000
+    # https://developers.google.com/youtube/v3/docs/videos (snippet.tags: 500 characters total)
+    tags_max_chars: 500
+  limits:
+    # Shorts: square or vertical, up to three minutes.
+    # https://support.google.com/youtube/answer/15424877
+    orientations: [vertical, square]
+    max_duration_s: 180
+    duration_margin_s: 2
+    min_duration_s: 1
+    # Recommended encoding: MP4, moov at front, H.264, AAC-LC/Opus 48 kHz.
+    # https://support.google.com/youtube/answer/1722171
+    video_codecs: [h264, hevc, vp9, av1]   # h264 recommended; others accepted by YouTube
+    audio_codecs: [aac, opus]
+    require_faststart: true
+    # 256 GB or 12 hours. https://support.google.com/youtube/answer/71673
+    max_size_bytes: 274877906944
+
+instagram:
+  # Phase 2. https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media
+  graph_url: https://graph.instagram.com
+  api_version: v25.0          # pinned; v26.0 is current (2026-07-29). TODO(verificar) before upgrading.
+  metadata:
+    caption_max: 2200
+    hashtags_max: 30
+    mentions_max: 20
+  limits:
+    orientations: [vertical, square, horizontal]   # 0.01:1–10:1 accepted, 9:16 recommended
+    min_duration_s: 3
+    max_duration_s: 900
+    video_codecs: [h264, hevc]
+    audio_codecs: [aac]
+    audio_max_sample_rate: 48000
+    min_fps: 23
+    max_fps: 60
+    max_width: 1920
+    require_faststart: true
+    max_size_bytes: 314572800   # 300 MB
+
+tiktok:
+  # Phase 3. https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide
+  api_url: https://open.tiktokapis.com
+  metadata:
+    caption_max: 2200
+  limits:
+    orientations: [vertical, square, horizontal]   # TODO(verificar): aspect-ratio rule not documented
+    max_duration_s: 600       # also capped per creator by max_video_post_duration_sec
+    video_codecs: [h264, hevc, vp8, vp9]
+    min_fps: 23
+    max_fps: 60
+    min_side: 360
+    max_side: 4096
+    max_size_bytes: 4294967296   # 4 GB

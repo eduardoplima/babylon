@@ -1,0 +1,7 @@
+.env
+.secrets/
+data/
+content/**/*.mp4
+.venv/
+__pycache__/
+.pytest_cache/
