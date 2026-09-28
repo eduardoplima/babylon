@@ -291,6 +291,25 @@ class TikTok:
                 return  # still processing: the next run checks again
             self.sleep(self.cfg.get("processing_poll_seconds", 10))
 
+    # -- metrics (phase 4) -------------------------------------------------
+
+    FIELDS = "id,create_time,duration,view_count,like_count,comment_count,share_count"
+
+    def collect(self, pubs: list[dict[str, Any]], today: str) -> dict[int, dict[str, float | None]]:
+        """Display API /v2/video/query/ (scope video.list), up to 20 ids per call. There is no
+        watch-time or retention data in any official API available to creators."""
+        out: dict[int, dict[str, float | None]] = {}
+        by_id = {p["remote_id"]: p for p in pubs}
+        ids = list(by_id)
+        for i in range(0, len(ids), 20):
+            data = self._api("/v2/video/query/", {"filters": {"video_ids": ids[i:i + 20]}}, params={"fields": self.FIELDS})
+            for v in data.get("videos", []):
+                pub = by_id.get(str(v.get("id")))
+                if pub:
+                    out[pub["id"]] = {k: float(v[k]) for k in ("view_count", "like_count", "comment_count", "share_count", "duration")
+                                      if isinstance(v.get(k), (int, float))}
+        return out
+
     def public_post_id(self, publish_id: str) -> str | None:
         """The TikTok video id once the creator has posted it publicly and it passed moderation."""
         data = self.fetch_status(publish_id)

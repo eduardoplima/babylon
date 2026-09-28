@@ -61,3 +61,11 @@ Research checked 2026-09-27. Graph API v26.0 is current; the docs' examples use 
 | subcodes 2207020/032/053 | New container |
 | 9/2207042 (max posts) | Retry after an hour |
 | subcodes 2207010/026/050/051/057; codes 102/190 (token) | Permanent |
+
+## Metrics collection (verified 2026-09-28)
+- **Request:** `GET /<media>/insights?metric=views,reach,likes,comments,shares,saved,total_interactions,ig_reels_avg_watch_time,ig_reels_video_view_total_time,reels_skip_rate`.
+  The period is always lifetime, so none is sent. Read `data[].values[0].value`.
+- **Fallback:** the docs warn that a multi-metric request can fail as a whole, so on an error each metric is asked for separately.
+- **Watch time:** the unit of `ig_reels_avg_watch_time` and `ig_reels_video_view_total_time` is **not documented**. It is stored raw
+  and not converted (TODO(verificar) against a real response).
+- **Facebook-Login-only fields:** `media_product_type` and several `*_count` fields are available only with Facebook Login, so they are not used.

@@ -229,6 +229,41 @@ class Instagram:
         d = _data(body)
         return int(d["config"]["quota_total"]) - int(d.get("quota_usage", 0))
 
+    # -- metrics (phase 4) -------------------------------------------------
+
+    # Valid for REELS: https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/insights
+    # TODO(verificar): units of ig_reels_avg_watch_time / ig_reels_video_view_total_time are not documented;
+    # stored raw.
+    INSIGHTS = ["views", "reach", "likes", "comments", "shares", "saved", "total_interactions",
+                "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "reels_skip_rate"]
+
+    def collect(self, pubs: list[dict[str, Any]], today: str) -> dict[int, dict[str, float | None]]:
+        """Lifetime insights per Reel (period is always lifetime). The docs warn a multi-metric
+        request can fail as a whole, so on a permanent error fall back to one metric at a time."""
+        out: dict[int, dict[str, float | None]] = {}
+        for p in pubs:
+            try:
+                values = self._insights(p["remote_id"], self.INSIGHTS)
+            except PermanentError:
+                values = {}
+                for metric in self.INSIGHTS:
+                    try:
+                        values.update(self._insights(p["remote_id"], [metric]))
+                    except PermanentError:
+                        values[metric] = None
+            out[p["id"]] = values
+        return out
+
+    def _insights(self, media_id: str, metrics: list[str]) -> dict[str, float | None]:
+        body = self._call("GET", f"{media_id}/insights", {"metric": ",".join(metrics)})
+        values = {}
+        for d in body.get("data", []):
+            v = (d.get("values") or [{}])[0].get("value")
+            if v is None and isinstance(d.get("total_value"), dict):
+                v = d["total_value"].get("value")
+            values[d["name"]] = float(v) if isinstance(v, (int, float)) else None
+        return values
+
     # -- state machine ----------------------------------------------------
 
     def publish(self, ctx: PublishContext) -> None:

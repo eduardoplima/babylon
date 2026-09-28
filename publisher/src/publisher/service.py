@@ -148,3 +148,48 @@ def publish_due(items: list[ContentItem], adapters: dict[str, Platform], conn: s
                 live_quota[name] -= 1
             outcomes.append(result)
     return outcomes
+
+
+def collect_metrics(adapters: dict[str, Platform], conn: sqlite3.Connection, *, now: datetime,
+                    log=None, sleep: Callable[[float], None] | None = None) -> list[Outcome]:
+    """Fetch metrics for every published post and store them with the collection time.
+    TikTok drafts sent to the inbox are linked first if the creator has since posted them.
+    A failure on one platform doesn't stop the others."""
+    outcomes = []
+    today = now.astimezone(timezone.utc).date().isoformat()
+    stamp = now.astimezone(timezone.utc).isoformat(timespec="seconds")
+    for name, adapter in adapters.items():
+        if not hasattr(adapter, "collect"):
+            continue
+        if name == "tiktok" and hasattr(adapter, "public_post_id"):
+            for row in conn.execute("SELECT * FROM publications WHERE platform = 'tiktok' AND state = ?", (db.SENT_TO_INBOX,)):
+                try:
+                    video_id = adapter.public_post_id(row["upload_session"])
+                except (TransientError, PermanentError) as exc:
+                    outcomes.append(Outcome(row["slug"], name, "failed", f"link: {exc}"))
+                    continue
+                if video_id:
+                    db.update(conn, row["id"], state=db.PUBLISHED, remote_id=video_id)
+                    outcomes.append(Outcome(row["slug"], name, "linked", video_id))
+        pubs = [dict(r) for r in conn.execute(
+            "SELECT * FROM publications WHERE platform = ? AND state = ? AND remote_id IS NOT NULL ORDER BY slug",
+            (name, db.PUBLISHED))]
+        if not pubs:
+            continue
+        try:
+            collected = with_retry(lambda: adapter.collect(pubs, today), attempts=3, **({"sleep": sleep} if sleep else {}))
+        except (TransientError, PermanentError) as exc:
+            if log:
+                log.error("metrics.failed", platform=name, error=str(exc))
+            outcomes += [Outcome(p["slug"], name, "failed", str(exc)) for p in pubs]
+            continue
+        for p in pubs:
+            values = collected.get(p["id"])
+            if values:
+                db.insert_metrics(conn, p["id"], values, stamp)
+                outcomes.append(Outcome(p["slug"], name, "collected", ", ".join(f"{k}={v:g}" for k, v in values.items() if v is not None)))
+            else:
+                outcomes.append(Outcome(p["slug"], name, "skipped", "no data returned yet"))
+        if log:
+            log.info("metrics.collected", platform=name, publications=len(pubs), with_data=sum(1 for p in pubs if collected.get(p["id"])))
+    return outcomes

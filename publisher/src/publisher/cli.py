@@ -7,7 +7,7 @@ from typing import Annotated, Optional
 
 import typer
 
-from . import babylon, content, db, log as logging, media, service
+from . import babylon, content, db, export as exporter, log as logging, media, service
 from .platforms.base import AuthRequired, Platform
 from .settings import Settings
 from .tokens import TokenStore
@@ -148,6 +148,48 @@ def _run(settings: Settings, live: bool, body) -> None:
     if not outcomes:
         typer.echo("nothing to do")
     raise typer.Exit(1 if any(o.action in ("failed", "invalid", "reconcile") for o in outcomes) else 0)
+
+
+@app.command("collect-metrics")
+def collect_metrics(platform: Annotated[Optional[list[str]], typer.Option("--platform", "-p")] = None):
+    """Fetch metrics for published posts (read-only API calls) and store them with a timestamp."""
+    settings = _settings()
+    logging.configure(settings.path(settings.log_path))
+    lg = logging.get(run=datetime.now(timezone.utc).isoformat(timespec="seconds"), command="collect-metrics")
+    conn = db.connect(settings.path(settings.db_path))
+    store = TokenStore(settings.path(settings.secrets_dir))
+    wanted = [p for p in (platform or IMPLEMENTED) if store.read(p)]
+    for p in set(platform or IMPLEMENTED) - set(wanted):
+        typer.echo(f"{p}: not authorized, skipped (`publisher auth {p}`)")
+    try:
+        outcomes = service.collect_metrics(_adapters(settings, True, wanted), conn, now=datetime.now(timezone.utc), log=lg)
+    except AuthRequired as exc:
+        typer.echo(f"auth: {exc}", err=True)
+        raise typer.Exit(2)
+    for o in outcomes:
+        typer.echo(str(o))
+    if not outcomes:
+        typer.echo("nothing published yet")
+    raise typer.Exit(1 if any(o.action == "failed" for o in outcomes) else 0)
+
+
+@app.command("export")
+def export_csv(path: Annotated[Path, typer.Argument(help="CSV file to write ('-' for stdout)")] = Path("data/metrics.csv")):
+    """Latest metrics per publication, with hook_type and format from meta.yaml."""
+    import sys
+
+    settings = _settings()
+    conn = db.connect(settings.path(settings.db_path))
+    items, _ = content.load_all(settings)
+    by_slug = {i.slug: i for i in items}
+    if str(path) == "-":
+        n = exporter.write(conn, by_slug, sys.stdout)
+    else:
+        target = settings.path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, "w", newline="") as fh:
+            n = exporter.write(conn, by_slug, fh)
+        typer.echo(f"wrote {n} rows to {target}")
 
 
 @app.command()

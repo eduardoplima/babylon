@@ -210,6 +210,41 @@ class YouTube:
             self.sleep(self.cfg.get("processing_poll_seconds", 15))
 
 
+    # -- metrics (phase 4) -------------------------------------------------
+
+    ANALYTICS_URL = "https://youtubeanalytics.googleapis.com/v2/reports"
+    # "Basic user activity statistics": no dimension, filters=video==ONE_ID (0 or 1 video filter).
+    # https://developers.google.com/youtube/analytics/channel_reports
+    ANALYTICS_METRICS = ["views", "engagedViews", "estimatedMinutesWatched", "averageViewDuration",
+                         "averageViewPercentage", "likes", "comments", "shares", "subscribersGained"]
+
+    def collect(self, pubs: list[dict[str, Any]], today: str) -> dict[int, dict[str, float | None]]:
+        """Data API statistics (near real time) + Analytics (48–72 h latency; empty until processed)."""
+        out: dict[int, dict[str, float | None]] = {}
+        by_id = {p["remote_id"]: p for p in pubs}
+        for i in range(0, len(pubs), 50):  # videos.list takes up to 50 ids, 1 quota unit
+            ids = [p["remote_id"] for p in pubs[i:i + 50]]
+            resp = self._request("GET", f"{self.cfg['api_url']}/videos", params={"id": ",".join(ids), "part": "statistics"})
+            if resp.status_code != 200:
+                raise classify(resp)
+            for video in resp.json().get("items", []):
+                st = video.get("statistics", {})  # counts are strings in the JSON
+                out[by_id[video["id"]]["id"]] = {k: float(st[k]) for k in ("viewCount", "likeCount", "commentCount") if k in st}
+        for p in pubs:
+            start = (p.get("published_at") or p.get("upload_started_at") or today)[:10]
+            resp = self._request("GET", self.ANALYTICS_URL, params={
+                "ids": "channel==MINE", "startDate": start, "endDate": today,
+                "metrics": ",".join(self.ANALYTICS_METRICS), "filters": f"video=={p['remote_id']}"})
+            if resp.status_code != 200:
+                raise classify(resp)
+            body = resp.json()
+            rows = body.get("rows") or []  # omitted when there is no data yet
+            if rows:
+                names = [h["name"] for h in body["columnHeaders"]]
+                out.setdefault(p["id"], {}).update({n: (float(v) if v is not None else None) for n, v in zip(names, rows[0])})
+        return out
+
+
 # -- credentials ----------------------------------------------------------
 
 def authorize(client_secrets: Path, store: TokenStore) -> None:

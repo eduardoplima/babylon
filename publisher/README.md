@@ -56,6 +56,29 @@ Example cron lines:
 0 9 * * *    cd /path/to/babylon/publisher && uv run publisher auth refresh
 ```
 
+## Metrics
+```bash
+uv run publisher collect-metrics          # read-only; run daily from cron (history is kept)
+uv run publisher export data/metrics.csv  # latest values per post + hook_type/format from meta.yaml
+```
+`collect-metrics` also links TikTok drafts that you have since posted.
+
+The CSV has **comparable columns**, which are left empty when a platform doesn't offer the metric:
+`views, likes, comments, shares, engaged_views, avg_view_seconds, avg_view_percent, saves, reach, skip_rate`.
+It also has every raw metric as `<platform>.<name>`.
+
+What each platform actually provides:
+
+| | YouTube | Instagram | TikTok |
+|---|---|---|---|
+| views / likes / comments / shares | ✓ | ✓ | ✓ |
+| average view duration and % watched | ✓ (Analytics, 48–72 h lag) | watch time only; **unit undocumented, kept raw** | ✗ |
+| saves, reach, 3-second skip rate | ✗ | ✓ | ✗ |
+| retention curve | not collected (per-video report; Shorts support unconfirmed) | ✗ | ✗ |
+
+YouTube Shorts `views` count every start and replay; `engaged_views` keeps the older definition.
+When generating the Instagram token, include the `instagram_business_manage_insights` permission.
+
 ## Guarantees
 - **One publication per (slug, platform):** it is `UNIQUE` in SQLite, claimed atomically, and never republished once done.
 - **Interrupted uploads resume** from the saved session.

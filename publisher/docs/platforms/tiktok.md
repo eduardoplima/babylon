@@ -65,3 +65,8 @@ Research checked 2026-09-27.
 - **Não confirmado:** whether an unaudited app with only `video.upload` can post from your own account.
   The upload get-started page mentions no audit, but a search snippet suggests private-only restrictions.
   Your first real run will tell.
+
+## Metrics collection (verified 2026-09-28)
+- **Request:** `POST /v2/video/query/?fields=id,create_time,duration,view_count,like_count,comment_count,share_count`
+  with `{"filters": {"video_ids": [...]}}`, up to 20 ids per call. It returns only the authorized user's own videos.
+- **Private videos:** whether they are returned is **não confirmado**.

@@ -129,3 +129,23 @@ def all_publications(conn: sqlite3.Connection, slug: str | None = None) -> list[
     if slug:
         return conn.execute("SELECT * FROM publications WHERE slug = ? ORDER BY platform", (slug,)).fetchall()
     return conn.execute("SELECT * FROM publications ORDER BY slug, platform").fetchall()
+
+
+def insert_metrics(conn: sqlite3.Connection, pub_id: int, values: dict[str, float | None],
+                   collected_at: str | None = None) -> None:
+    """One row per metric per collection (history is kept; export uses the latest)."""
+    ts = collected_at or now()
+    conn.executemany("INSERT INTO metrics (publication_id, collected_at, metric, value) VALUES (?, ?, ?, ?)",
+                     [(pub_id, ts, k, v) for k, v in values.items()])
+
+
+def latest_metrics(conn: sqlite3.Connection) -> dict[int, tuple[str, dict[str, float | None]]]:
+    """{publication_id: (collected_at, {metric: value})} from each publication's latest collection."""
+    rows = conn.execute("""
+        SELECT m.publication_id, m.collected_at, m.metric, m.value FROM metrics m
+        JOIN (SELECT publication_id, MAX(collected_at) AS last FROM metrics GROUP BY publication_id) l
+          ON l.publication_id = m.publication_id AND l.last = m.collected_at""").fetchall()
+    out: dict[int, tuple[str, dict[str, float | None]]] = {}
+    for r in rows:
+        out.setdefault(r["publication_id"], (r["collected_at"], {}))[1][r["metric"]] = r["value"]
+    return out
