@@ -16,23 +16,37 @@ app = typer.Typer(no_args_is_help=True, add_completion=False, help=__doc__)
 auth_app = typer.Typer(no_args_is_help=True, help="Authorize platforms (stores tokens in the secrets folder).")
 app.add_typer(auth_app, name="auth")
 
-IMPLEMENTED = ("youtube",)
+IMPLEMENTED = ("youtube", "instagram")
 
 
 def _settings() -> Settings:
     return Settings()
 
 
+class _DryAuth:
+    """Stands in for credentials during a dry run (nothing is sent)."""
+
+    def token(self, force: bool = False) -> str:
+        return "dry-run"
+
+    def user_id(self) -> str:
+        return "dry-run"
+
+
 def _adapters(settings: Settings, live: bool, only: list[str] | None = None) -> dict[str, Platform]:
     """Adapters for implemented platforms. In dry-run no credentials are loaded."""
-    from .platforms import youtube
+    from .platforms import instagram, youtube
 
     store = TokenStore(settings.path(settings.secrets_dir))
     adapters: dict[str, Platform] = {}
     for name in only or IMPLEMENTED:
         if name == "youtube":
-            token = youtube.token_provider(store) if live else (lambda force=False: "dry-run")
+            token = youtube.token_provider(store) if live else _DryAuth().token
             adapters[name] = youtube.YouTube(settings.platform("youtube"), token)
+        elif name == "instagram":
+            cfg = settings.platform("instagram")
+            auth = instagram.InstagramAuth(store, cfg) if live else _DryAuth()
+            adapters[name] = instagram.Instagram(cfg, auth)
     return adapters
 
 
@@ -157,12 +171,13 @@ def resolve(slug: str, platform: str,
         typer.echo("no such publication", err=True)
         raise typer.Exit(1)
     if remote_id:
+        # Instagram permalinks aren't derivable from the media id; `status` shows the id instead.
         url = f"https://www.youtube.com/shorts/{remote_id}" if platform == "youtube" else None
         db.update(conn, row["id"], state=db.PUBLISHED, remote_id=remote_id, remote_url=url, upload_session=None,
                   published_at=db.now(), last_error=None)
     else:
         db.update(conn, row["id"], state=db.PENDING, retryable=1, upload_session=None, remote_id=None,
-                  remote_url=None, last_error=None)
+                  remote_url=None, last_error=None, retry_after=None, attempts=0, upload_started_at=None)
     typer.echo(f"{slug} [{platform}] → {db.get(conn, slug, platform)['state']}")
 
 
@@ -178,6 +193,50 @@ def auth_youtube():
         typer.echo(str(exc), err=True)
         raise typer.Exit(2)
     typer.echo("YouTube authorized.")
+
+
+@auth_app.command("instagram")
+def auth_instagram():
+    """Store a long-lived Instagram token (App Dashboard → Instagram → API setup with Instagram
+    business login → Generate token). Typed without echo so it stays out of shell history."""
+    from .platforms import instagram
+
+    settings = _settings()
+    token = typer.prompt("Instagram access token", hide_input=True).strip()
+    auth = instagram.InstagramAuth(TokenStore(settings.path(settings.secrets_dir)), settings.platform("instagram"))
+    try:
+        info = auth.save_token(token)
+    except Exception as exc:  # classify() errors carry the API message
+        typer.echo(f"token rejected: {exc}", err=True)
+        raise typer.Exit(2)
+    typer.echo(f"Instagram authorized as @{info['username']} (IG user {info['user_id']}); "
+               f"expires {info['expires_at'][:10]}, refreshed automatically after 24 h.")
+
+
+@auth_app.command("refresh")
+def auth_refresh():
+    """Refresh tokens that are due (safe to run daily from cron) and show how long each lasts."""
+    from .platforms import instagram, youtube
+
+    settings = _settings()
+    store = TokenStore(settings.path(settings.secrets_dir))
+    failed = False
+    if store.read("youtube"):
+        try:
+            youtube.token_provider(store)(True)
+            typer.echo("youtube: refreshed")
+        except AuthRequired as exc:
+            failed = True
+            typer.echo(f"youtube: {exc}", err=True)
+    if store.read("instagram"):
+        auth = instagram.InstagramAuth(store, settings.platform("instagram"))
+        try:
+            auth.token()
+            typer.echo(f"instagram: {auth.days_left():.0f} days left")
+        except Exception as exc:
+            failed = True
+            typer.echo(f"instagram: {exc}", err=True)
+    raise typer.Exit(1 if failed else 0)
 
 
 @app.command("import-babylon")

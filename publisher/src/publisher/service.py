@@ -7,9 +7,10 @@ from typing import Callable
 from . import db
 from .content import ContentItem
 from .platforms.base import NeedsReconcile, Platform, PublishContext
-from .retry import PermanentError, PlatformError, TransientError, with_retry
+from .retry import PermanentError, TransientError, with_retry
 
 MAX_RUNS = 5  # publish-due stops retrying a retryable failure after this many runs
+RETRY_LATER = timedelta(hours=1)  # cooldown after a quota-type failure (limits reset daily)
 
 
 @dataclass
@@ -24,7 +25,8 @@ class Outcome:
 
 
 def publish(item: ContentItem, adapter: Platform, conn: sqlite3.Connection, *, live: bool,
-            log=None, force: bool = False, sleep: Callable[[float], None] | None = None) -> Outcome:
+            log=None, force: bool = False, sleep: Callable[[float], None] | None = None,
+            now: datetime | None = None) -> Outcome:
     slug, name = item.slug, adapter.name
     out = lambda action, detail="": Outcome(slug, name, action, detail)
 
@@ -46,6 +48,7 @@ def publish(item: ContentItem, adapter: Platform, conn: sqlite3.Connection, *, l
         resume = f" (resume from state {state})" if row else ""
         return out("dry-run", adapter.describe(item) + resume + (f" [{warnings}]" if warnings else ""))
 
+    adapter.preflight()  # AuthRequired propagates before any state is written
     row = db.ensure(conn, slug, name)
     target = db.PROCESSING if row["state"] == db.PROCESSING else db.UPLOADING
     if not db.claim(conn, row["id"], (db.PENDING, db.FAILED, db.UPLOADING, db.PROCESSING), target):
@@ -67,6 +70,10 @@ def publish(item: ContentItem, adapter: Platform, conn: sqlite3.Connection, *, l
         save(state=db.NEEDS_RECONCILE, last_error=str(exc))
         return _finish(conn, attempt, log, "error", exc, out("reconcile", str(exc)))
     except PermanentError as exc:
+        if exc.retry_later:
+            after = ((now or datetime.now(timezone.utc)).astimezone(timezone.utc) + RETRY_LATER).isoformat(timespec="seconds")
+            save(state=db.FAILED, retryable=1, retry_after=after, last_error=str(exc))
+            return _finish(conn, attempt, log, "permanent", exc, out("failed", f"{exc} (retry after {after})"))
         save(state=db.FAILED, retryable=0, last_error=str(exc))
         return _finish(conn, attempt, log, "permanent", exc, out("failed", str(exc)))
     except TransientError as exc:
@@ -77,6 +84,8 @@ def publish(item: ContentItem, adapter: Platform, conn: sqlite3.Connection, *, l
         _finish(conn, attempt, log, "error", exc, None)
         raise
 
+    if pub.get("retry_after"):
+        save(retry_after=None)
     db.finish_attempt(conn, attempt, "success")
     if log:
         log.info("publish.ok", state=pub["state"], remote_id=pub.get("remote_id"))
@@ -105,6 +114,7 @@ def publish_due(items: list[ContentItem], adapters: dict[str, Platform], conn: s
     outcomes = []
     since = (now.astimezone(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     used = {p: db.count_uploads_since(conn, p, since) for p in adapters}
+    live_quota: dict[str, int] = {}  # platforms that report their remaining quota (asked once per run)
     for item in sorted(due(items, now, tz), key=lambda i: i.meta.schedule_at(tz)):
         for name in item.meta.platforms():
             adapter = adapters.get(name)
@@ -112,6 +122,9 @@ def publish_due(items: list[ContentItem], adapters: dict[str, Platform], conn: s
                 outcomes.append(Outcome(item.slug, name, "skipped", "adapter not implemented yet"))
                 continue
             row = db.get(conn, item.slug, name)
+            if row and row["retry_after"] and row["retry_after"] > now.astimezone(timezone.utc).isoformat(timespec="seconds"):
+                outcomes.append(Outcome(item.slug, name, "skipped", f"waiting until {row['retry_after']}: {row['last_error']}"))
+                continue
             if row and row["state"] == db.FAILED and row["retryable"] and row["attempts"] >= MAX_RUNS:
                 outcomes.append(Outcome(item.slug, name, "skipped", f"gave up after {row['attempts']} runs: {row['last_error']}"))
                 continue
@@ -119,8 +132,16 @@ def publish_due(items: list[ContentItem], adapters: dict[str, Platform], conn: s
             if fresh and name in daily_caps and used[name] >= daily_caps[name]:
                 outcomes.append(Outcome(item.slug, name, "skipped", f"daily cap {daily_caps[name]} reached"))
                 continue
-            result = publish(item, adapter, conn, live=live, log=log, sleep=sleep)
+            if live and hasattr(adapter, "remaining_quota") and (row is None or row["state"] != db.PROCESSING):
+                if name not in live_quota:
+                    live_quota[name] = adapter.remaining_quota()
+                if live_quota[name] <= 0:
+                    outcomes.append(Outcome(item.slug, name, "skipped", "platform publishing quota used up for now"))
+                    continue
+            result = publish(item, adapter, conn, live=live, log=log, sleep=sleep, now=now)
             if live and fresh and result.action in ("published", "processing", "failed"):
                 used[name] += 1 if db.get(conn, item.slug, name)["upload_started_at"] else 0
+            if name in live_quota and result.action == "published":
+                live_quota[name] -= 1
             outcomes.append(result)
     return outcomes

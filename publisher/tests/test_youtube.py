@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -159,14 +159,29 @@ def google_error(code, reason):
     return httpx.Response(code, json={"error": {"code": code, "message": reason, "errors": [{"reason": reason}]}})
 
 
-def test_quota_exceeded_is_permanent(item, yt, conn, api, settings):
+def test_quota_exceeded_waits_then_retries_later(item, yt, conn, api, settings):
     api.start.mock(return_value=google_error(403, "quotaExceeded"))
-    out = service.publish(item, yt, conn, live=True, sleep=noop)
-    assert out.action == "failed" and "quotaExceeded" in out.detail
+    args = dict(live=True, tz=settings.tz, daily_caps={}, sleep=noop)
+    out = service.publish_due([item], {"youtube": yt}, conn, now=NOW, **args)[0]
+    assert out.action == "failed" and "quotaExceeded" in out.detail and "retry after" in out.detail
+    assert api.start.call_count == 1  # no immediate retries
     row = db.get(conn, "001-test", "youtube")
-    assert row["state"] == db.FAILED and row["retryable"] == 0
+    assert row["state"] == db.FAILED and row["retryable"] == 1 and row["retry_after"]
     attempt = conn.execute("SELECT * FROM attempts").fetchone()
     assert (attempt["outcome"], attempt["http_status"], attempt["reason"]) == ("permanent", 403, "quotaExceeded")
+    assert row["retry_after"] == "2026-10-02T13:00:00+00:00"  # NOW + 1 h
+    due = service.publish_due([item], {"youtube": yt}, conn, now=NOW + timedelta(minutes=30), **args)
+    assert due[0].action == "skipped" and "waiting until" in due[0].detail and api.start.call_count == 1
+    happy(api)
+    due = service.publish_due([item], {"youtube": yt}, conn, now=NOW + timedelta(hours=2), **args)
+    assert due[0].action == "published" and db.get(conn, "001-test", "youtube")["retry_after"] is None
+
+
+def test_invalid_request_is_permanent_and_never_retried(item, yt, conn, api, settings):
+    api.start.mock(return_value=google_error(400, "invalidTitle"))
+    out = service.publish(item, yt, conn, live=True, sleep=noop)
+    assert out.action == "failed"
+    assert db.get(conn, "001-test", "youtube")["retryable"] == 0
     due = service.publish_due([item], {"youtube": yt}, conn, live=True, now=NOW, tz=settings.tz, daily_caps={}, sleep=noop)
     assert due[0].action == "skipped" and api.start.call_count == 1
 
@@ -209,3 +224,16 @@ def test_invalid_media_is_not_uploaded(settings, tmp_path, yt, conn, api):
     item = content.load(write_content(settings, "002-wide", wide), settings)
     out = service.publish(item, yt, conn, live=True, sleep=noop)
     assert out.action == "invalid" and "horizontal" in out.detail and not api.calls
+
+
+def test_missing_credentials_leave_no_trace(item, conn, api, settings):
+    from publisher.platforms.base import AuthRequired
+
+    def no_token(force=False):
+        raise AuthRequired("no YouTube token; run `publisher auth youtube`")
+
+    yt = YouTube(settings.platform("youtube"), no_token, http=httpx.Client(), sleep=noop)
+    with pytest.raises(AuthRequired):
+        service.publish(item, yt, conn, live=True, sleep=noop)
+    assert conn.execute("SELECT COUNT(*) FROM publications").fetchone()[0] == 0
+    assert not api.calls

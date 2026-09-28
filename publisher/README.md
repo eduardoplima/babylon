@@ -1,6 +1,6 @@
 # publisher
 
-Publishes Babylon shorts to YouTube Shorts (Instagram Reels and TikTok come in phases 2–3) and
+Publishes Babylon shorts to YouTube Shorts and Instagram Reels (TikTok comes in phase 3) and
 collects metrics back (phase 4). Every publishing command is a **dry run unless `--live`**.
 
 ## Setup
@@ -15,6 +15,14 @@ To authorize YouTube:
 3. Set the consent screen to **In production**. In "Testing", refresh tokens expire after 7 days.
 4. Run `uv run publisher auth youtube` (opens the browser).
 
+To authorize Instagram (an Instagram **Professional** account; no Facebook Page is needed):
+1. In the Meta App Dashboard, create an app with **Instagram → API setup with Instagram business login**.
+2. Add your Instagram account, then click **Generate token** next to it. Dashboard tokens are long-lived (60 days).
+3. Run `uv run publisher auth instagram` and paste the token (it is not echoed).
+4. Tokens are refreshed automatically once they are at least 24 h old. Run `uv run publisher auth refresh` daily from cron to be safe.
+
+**Instagram has no private posts.** `--live` publishes a public Reel, so run it only when the video is ready.
+
 ## Workflow
 ```bash
 uv run publisher import-babylon ../channels/roman-in-stones/videos/001-tempus-edax-rerum
@@ -22,17 +30,24 @@ uv run publisher import-babylon ../channels/roman-in-stones/videos/001-tempus-ed
 uv run publisher validate <slug>
 uv run publisher publish <slug> -p youtube            # dry run
 uv run publisher publish <slug> -p youtube --live     # uploads (private until the API project is audited)
+uv run publisher publish <slug> -p instagram --live   # publishes a PUBLIC Reel
 uv run publisher publish-due --live                   # for cron / systemd timers
 uv run publisher status
 uv run publisher resolve <slug> youtube --remote-id <id> | --reset   # settle needs_reconcile
 ```
-Example cron line (every 15 min): `*/15 * * * * cd /path/to/babylon/publisher && uv run publisher publish-due --live`.
+Example cron lines:
+```
+*/15 * * * * cd /path/to/babylon/publisher && uv run publisher publish-due --live
+0 9 * * *    cd /path/to/babylon/publisher && uv run publisher auth refresh
+```
 
 ## Guarantees
 - **One publication per (slug, platform):** it is `UNIQUE` in SQLite, claimed atomically, and never republished once done.
 - **Interrupted uploads resume** from the saved session.
 - **Unknown outcomes** become `needs_reconcile` and are never retried automatically.
 - **Transient errors** (5xx, rate limits) retry with exponential backoff. Permanent ones are recorded with the API message.
+- **Daily quotas** (YouTube `quotaExceeded`, Instagram "maximum number of posts") are not retried immediately; `publish-due` tries again after an hour. Instagram's remaining quota is read live before publishing.
+- **Credentials are checked before any state changes**, so a missing token leaves nothing behind.
 - **Logging and data:** JSON logs go to `data/publisher.log.jsonl`, and every attempt is stored in the `attempts` table.
 - **Secrets** live in `.secrets/` (mode 600), `.env` and `data/`, all gitignored.
 

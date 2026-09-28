@@ -20,7 +20,14 @@ class TransientError(PlatformError):
 
 
 class PermanentError(PlatformError):
-    """Retrying won't help: invalid input, quota exhausted, forbidden."""
+    """Retrying now won't help: invalid input, forbidden, quota exhausted.
+    `retry_later=True` marks limits that reset (daily quotas): no immediate retries, but
+    publish-due tries again after the platform's cooldown."""
+
+    def __init__(self, message: str, *, status: int | None = None, reason: str | None = None,
+                 retry_later: bool = False):
+        super().__init__(message, status=status, reason=reason)
+        self.retry_later = retry_later
 
 
 def with_retry(fn: Callable[[], T], *, attempts: int = 5, base_delay: float = 2.0, max_delay: float = 60.0,

@@ -32,6 +32,8 @@ SCOPES = [
 
 # Error reasons worth retrying (the official upload sample retries 500/502/503/504).
 TRANSIENT_REASONS = {"backendError", "rateLimitExceeded", "internalError"}
+# Daily limits that reset: don't retry now, retry on a later run.
+QUOTA_REASONS = {"quotaExceeded", "uploadLimitExceeded"}
 
 
 def classify(resp: httpx.Response) -> TransientError | PermanentError:
@@ -44,8 +46,10 @@ def classify(resp: httpx.Response) -> TransientError | PermanentError:
         reason = (err.get("errors") or [{}])[0].get("reason") or err.get("status")
     except (ValueError, KeyError, TypeError):
         pass
-    cls = TransientError if resp.status_code >= 500 or reason in TRANSIENT_REASONS else PermanentError
-    return cls(f"YouTube {resp.status_code} {reason or ''}: {message}".strip(), status=resp.status_code, reason=reason)
+    text = f"YouTube {resp.status_code} {reason or ''}: {message}".strip()
+    if resp.status_code >= 500 or reason in TRANSIENT_REASONS:
+        return TransientError(text, status=resp.status_code, reason=reason)
+    return PermanentError(text, status=resp.status_code, reason=reason, retry_later=reason in QUOTA_REASONS)
 
 
 class YouTube:
@@ -82,6 +86,9 @@ class YouTube:
                 "containsSyntheticMedia": meta.synthetic_media,
             },
         }
+
+    def preflight(self) -> None:
+        self.token(False)
 
     # -- HTTP -------------------------------------------------------------
 

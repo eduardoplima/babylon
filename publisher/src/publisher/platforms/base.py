@@ -36,6 +36,9 @@ class Platform(Protocol):
     def describe(self, item: ContentItem) -> str:
         """One line saying what publish() would do (for --dry-run)."""
 
+    def preflight(self) -> None:
+        """Check credentials before any state changes. Raises AuthRequired."""
+
     def publish(self, ctx: PublishContext) -> None:
         """Drive the publication forward from ctx.pub's state, saving progress as it goes.
         Raises TransientError, PermanentError or NeedsReconcile."""

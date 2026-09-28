@@ -56,6 +56,8 @@ MIGRATIONS = [
     );
     CREATE INDEX metrics_pub ON metrics (publication_id, metric, collected_at);
     """,
+    # retry_after: a quota-type failure waits until this time before publish-due tries again
+    "ALTER TABLE publications ADD COLUMN retry_after TEXT",
 ]
 
 

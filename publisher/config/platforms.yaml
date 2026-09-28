@@ -43,9 +43,18 @@ youtube:
     max_size_bytes: 274877906944
 
 instagram:
-  # Phase 2. https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media
+  # Instagram API with Instagram Login. https://developers.facebook.com/docs/instagram-platform/content-publishing
   graph_url: https://graph.instagram.com
   api_version: v25.0          # pinned; v26.0 is current (2026-07-29). TODO(verificar) before upgrading.
+  # "query a container's status once per minute, for no more than 5 minutes" (publishing guide)
+  processing_poll_seconds: 60
+  processing_timeout_seconds: 300
+  # Dashboard/long-lived tokens last 60 days; refresh needs the token to be >= 24 h old.
+  # https://developers.facebook.com/docs/instagram-platform/reference/refresh_access_token
+  token_lifetime_days: 60
+  refresh_when_days_left: 50
+  # Daily publishing limit: docs say 100 (guide) and 50 (reference); read live from
+  # /<IG_ID>/content_publishing_limit before publishing instead of hardcoding.
   metadata:
     caption_max: 2200
     hashtags_max: 30
